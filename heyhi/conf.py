@@ -460,7 +460,7 @@ def conf_to_dict(cfg, include_defaults=False):
     if cfg.is_frozen():
         return conf_to_dict(cfg._msg, include_defaults=include_defaults)
     return google.protobuf.json_format.MessageToDict(
-        cfg, preserving_proto_field_name=True, including_default_value_fields=include_defaults
+        cfg, preserving_proto_field_name=True #, including_default_value_fields=include_defaults
     )
 
 

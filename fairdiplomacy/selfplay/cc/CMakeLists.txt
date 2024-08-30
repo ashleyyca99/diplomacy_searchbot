@@ -5,6 +5,11 @@ if(NOT DEFINED POSTMAN_DIR)
   message(FATAL_ERROR "Must set 'POSTMAN_DIR' variable")
 endif(NOT DEFINED POSTMAN_DIR)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+
 ###########################################
 # Global flags
 
@@ -16,8 +21,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 #############################################
 # Declare dependencies
 find_package(Threads REQUIRED)
-find_package(PythonInterp 3.7 REQUIRED)
-find_package(PythonLibs 3.7 REQUIRED)
+find_package(PythonInterp 3.10 REQUIRED)
+find_package(PythonLibs 3.10 REQUIRED)
 
 # Make sure we are compatible with torch ABI. Must go before any add_subdirectory.
 execute_process(
@@ -51,14 +56,14 @@ set(TORCH_PYTHON_LIBRARIES "${TORCH_PATH}/lib/libtorch_python.so")
 
 ### Nest ###
 add_library(nest INTERFACE)
-target_include_directories(nest INTERFACE ${POSTMAN_DIR}/nest/nest)
+target_include_directories(nest INTERFACE ${POSTMAN_DIR}/nest/nest /usr/include/python3.10)
 
 ### Python module ###
 pybind11_add_module(
   rela
   pybind.cc
 )
-target_include_directories(rela PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_include_directories(rela PRIVATE ${PYTHON_INCLUDE_DIRS} /usr/include/python3.10)
 target_link_libraries(rela
   PUBLIC
   ${TORCH_LIBRARIES} ${TORCH_PYTHON_LIBRARIES} nest
@@ -70,11 +75,12 @@ include(GoogleTest)
 enable_testing()
 
 add_executable(prioritized_replay_test prioritized_replay_test.cc)
-target_include_directories(prioritized_replay_test PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_include_directories(prioritized_replay_test PRIVATE ${PYTHON_INCLUDE_DIRS} /usr/include/python3.10)
 target_link_libraries(prioritized_replay_test
   PUBLIC
   gtest_main
   ${TORCH_LIBRARIES} ${TORCH_PYTHON_LIBRARIES} nest
+  python3.10
 )
 set_target_properties(prioritized_replay_test PROPERTIES CXX_STANDARD 17)
 add_test(NAME prioritized_replay_test COMMAND prioritized_replay_test)

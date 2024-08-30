@@ -7,6 +7,10 @@ project(postman VERSION 0.2.2 LANGUAGES CXX)
 # For pybind11 to work on Linux.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 #############################################
 ### LIBS ####################################
 #############################################
@@ -89,6 +93,7 @@ add_library(postman STATIC
   "${hw_proto_srcs}" "${hw_proto_hdrs}" "${hw_grpc_srcs}" "${hw_grpc_hdrs}")
 target_include_directories(postman PUBLIC ${gen_proto_dir})
 target_include_directories(postman PUBLIC include)
+target_include_directories(postman PUBLIC /home/gzhang/miniconda3/include/python3.7m)
 target_link_libraries(postman PUBLIC grpc libprotobuf grpc++ ${TORCH_LIBRARIES} ${TORCH_PYTHON_LIBRARIES} nest)
 set_target_properties(postman PROPERTIES CXX_STANDARD 17)
 

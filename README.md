@@ -96,12 +96,12 @@ cd diplomacy_searchbot
 apt-get install -y wget bzip2 ca-certificates curl git build-essential clang-format-8 git wget cmake build-essential autoconf libtool pkg-config libgoogle-glog-dev
 
 # Install conda
-wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-4.7.10-Linux-x86_64.sh -O ~/miniconda.sh
-/bin/bash ~/miniconda.sh -b
+wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-py310_24.7.1-0-Linux-x86_64.sh -O ~/miniconda310.sh
+/bin/bash ~/miniconda310.sh -b
 
 # Create conda env
 conda create --yes -n diplomacy python=3.7
-source activate diplomacy
+conda activate diplomacy
 
 # Install pytorch, pybind11
 conda install --yes pytorch=1.7.1 torchvision cudatoolkit=11.0 -c pytorch
@@ -113,12 +113,12 @@ conda install pybind11
 conda install go protobuf=3.19.1 --yes
 
 # Install python requirements
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
 # Local pip installs
-pip install -e ./thirdparty/github/fairinternal/postman/nest/
-pip install -e ./thirdparty/github/fairinternal/postman/postman/
-pip install -e . -vv
+python -m pip install -e ./thirdparty/github/fairinternal/postman/nest/
+python -m pip install -e ./thirdparty/github/fairinternal/postman/postman/
+python -m pip install -e . -vv
 
 # Make
 make

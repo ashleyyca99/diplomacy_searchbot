@@ -11,7 +11,8 @@ pandas
 parameterized
 psutil
 pre-commit
-pyzmq==20.0.0
+#pyzmq==20.0.0
+pyzmq==23.2.1
 tabulate
 tensorboard
 torch
@@ -25,6 +26,6 @@ pyyaml
 python-hostlist
 gym>=0.9.6
 requests
-grpcio==1.15.0
-grpcio-tools==1.15.0
+grpcio #==1.15.0
+grpcio-tools #==1.15.0
 submitit~=1.4
