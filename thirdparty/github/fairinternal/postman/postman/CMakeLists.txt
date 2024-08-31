@@ -16,8 +16,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 #############################################
 # Declare dependencies
 find_package(Threads REQUIRED)
-find_package(PythonInterp 3.7 REQUIRED)
-find_package(PythonLibs 3.7 REQUIRED)
+find_package(PythonInterp 3.10 REQUIRED)
+find_package(PythonLibs 3.10 REQUIRED)
 
 # Make sure we are compatible with torch ABI. Must go before any add_subdirectory.
 execute_process(
@@ -93,7 +93,6 @@ add_library(postman STATIC
   "${hw_proto_srcs}" "${hw_proto_hdrs}" "${hw_grpc_srcs}" "${hw_grpc_hdrs}")
 target_include_directories(postman PUBLIC ${gen_proto_dir})
 target_include_directories(postman PUBLIC include)
-target_include_directories(postman PUBLIC /home/gzhang/miniconda3/include/python3.7m)
 target_link_libraries(postman PUBLIC grpc libprotobuf grpc++ ${TORCH_LIBRARIES} ${TORCH_PYTHON_LIBRARIES} nest)
 set_target_properties(postman PROPERTIES CXX_STANDARD 17)
 
