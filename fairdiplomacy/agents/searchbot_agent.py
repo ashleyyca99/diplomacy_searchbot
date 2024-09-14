@@ -49,11 +49,16 @@ from fairdiplomacy.typedefs import (
 )
 
 
+from fairdiplomacy.agents.tree_swap import (
+    RWM, ORWM, BMAlg, TreeSwap
+)
+
+
 ActionDict = Dict[Tuple[Power, Action], float]
 
 
 class CFRData:
-    def __init__(self, bp_policy: PowerPolicies, use_optimistic_cfr: bool):
+    def __init__(self, bp_policy: PowerPolicies, use_optimistic_cfr: bool, rollouts, algorithm_cfg):
 
         self.use_optimistic_cfr = use_optimistic_cfr
         self.sigma: ActionDict = {}
@@ -62,9 +67,30 @@ class CFRData:
         self.cum_utility: Dict[Power, float] = defaultdict(float)
         self.bp_sigma: Optional[ActionDict] = defaultdict(float)
         self.cum_weight = 0
+        self.cfr_iter = 0
 
         self.power_plausible_orders: PlausibleOrders = {p: sorted(v) for p, v in bp_policy.items()}
 
+        logging.info(f"Creating algoritms using config:\n{algorithm_cfg}")
+        self.algorithms = {}  # algorithm per power
+        T = rollouts
+        for pwr, actions in self.power_plausible_orders.items():
+            N = len(actions)
+            M = np.round(np.log(T)).astype(int)
+            d = np.round(np.log(T) / np.log(M)).astype(int) + 1
+            eta1 = np.sqrt(np.log(N) / T) # for RWM, BM
+            eta2 = np.sqrt(np.log(N) / M) # for TreeSwap
+            alg_2nd_name = algorithm_cfg.secondary_algorithm
+            alg_2nd = RWM if alg_2nd_name == "RWM" else ORWM if alg_2nd_name == "ORWM" else None
+            if algorithm_cfg.primary_algorithm == "RWM":
+                self.algorithms[pwr] = RWM(eta=eta1, N=N)
+            elif algorithm_cfg.primary_algorithm == "ORWM":
+                self.algorithms[pwr] = ORWM(eta=eta1, N=N)
+            elif algorithm_cfg.primary_algorithm == "BM":
+                self.algorithms[pwr] = BMAlg(alg_2nd, eta1, N=N)
+            elif algorithm_cfg.primary_algorithm == "TreeSwap":
+                self.algorithms[pwr] = TreeSwap(alg_2nd, eta2, M, d)
+            
         if all(x <= 0 for y in bp_policy.values() for x in y.values()):
             # this is a dummy policy, only the order keys should be used
             self.bp_sigma = None
@@ -79,7 +105,10 @@ class CFRData:
     def strategy(self, pwr) -> List[float]:
         actions = self.power_plausible_orders[pwr]
         try:
-            return [self.sigma[(pwr, a)] for a in actions]
+            if pwr in self.algorithms.keys():
+                return self.algorithms[pwr].act(self.cfr_iter)
+            else:
+                return [self.sigma[(pwr, a)] for a in actions]
         except KeyError:
             return [1.0 / len(actions) for _ in actions]
 
@@ -122,28 +151,38 @@ class CFRData:
         # note: this isn't correct until update is called!
         self.cum_weight = self.cum_weight * discount_factor + 1.0
 
-    def update(self, pwr, actions, state_utility, action_regrets, sigmas):
+    def update(self, cfr_iter, pwr, actions, state_utility, action_regrets):
+        #print ("hi") # try multiplicitive weights and compare with BM and BM with multiplicitive weights
+        #import traceback
+        #traceback.print_stack()
+        ### x = self.algorithms[pwr].act(cfr_iter)
+        self.cfr_iter = cfr_iter
+
+        sigmas = self.strategy(pwr)
         for action, regret, sigma in zip(actions, action_regrets, sigmas):
             self.cum_regrets[(pwr, action)] += regret
             self.cum_sigma[(pwr, action)] += sigma
         self.cum_utility[pwr] += state_utility
 
-        if self.use_optimistic_cfr:
-            pos_regrets = [
-                max(0, self.cum_regrets[(pwr, a)] + regret)
-                for a, regret in zip(actions, action_regrets)
-            ]
+        if pwr in self.algorithms.keys():
+            self.algorithms[pwr].update(action_regrets)
         else:
-            pos_regrets = [max(0, self.cum_regrets[(pwr, a)]) for a in actions]
+            if self.use_optimistic_cfr:
+                pos_regrets = [
+                    max(0, self.cum_regrets[(pwr, a)] + regret)
+                    for a, regret in zip(actions, action_regrets)
+                ]
+            else:
+                pos_regrets = [max(0, self.cum_regrets[(pwr, a)]) for a in actions]
 
-        sum_pos_regrets = sum(pos_regrets)
-        if sum_pos_regrets == 0:
-            max_action = max(actions, key=lambda action: self.cum_regrets[(pwr, action)])
-            for action in actions:
-                self.sigma[(pwr, action)] = float(action == max_action)
-        else:
-            for action, pos_regret in zip(actions, pos_regrets):
-                self.sigma[(pwr, action)] = pos_regret / sum_pos_regrets
+            sum_pos_regrets = sum(pos_regrets)
+            if sum_pos_regrets == 0:
+                max_action = max(actions, key=lambda action: self.cum_regrets[(pwr, action)])
+                for action in actions:
+                    self.sigma[(pwr, action)] = float(action == max_action)
+            else:
+                for action, pos_regret in zip(actions, pos_regrets):
+                    self.sigma[(pwr, action)] = pos_regret / sum_pos_regrets
 
     def sorted_policy(self, pwr, probs):
         return dict(
@@ -208,6 +247,8 @@ class SearchBotAgent(BaseSearchAgent):
             cfg.plausible_orders_cfg, model=self.model
         )
         self.order_aug_cfg = cfg.order_aug
+
+        self.algorithm_cfg = cfg.algorithm_cfg
 
         logging.info(f"Initialized SearchBotAgent: {self.__dict__}")
 
@@ -331,7 +372,7 @@ class SearchBotAgent(BaseSearchAgent):
                 bp_policy[p].update({order: 0 for order in orders})
                 logging.info(f"Adding extra plausible orders {p}: {orders}")
 
-        cfr_data = CFRData(bp_policy, self.use_optimistic_cfr)
+        cfr_data = CFRData(bp_policy, self.use_optimistic_cfr, self.n_rollouts, self.algorithm_cfg)
         del bp_policy
 
         # If there are <=1 plausible orders, no need to search
@@ -473,7 +514,7 @@ class SearchBotAgent(BaseSearchAgent):
                 # update cfr data structures
                 # FIXME: shouldn't this happen before `log_cfr_iter_state`? (not a big deal)
                 cfr_data.update(
-                    pwr, actions, state_utility, action_regrets, cfr_data.strategy(pwr)
+                    cfr_iter, pwr, actions, state_utility, action_regrets
                 )
 
             if self.enable_compute_nash_conv and verbose_log_iter:

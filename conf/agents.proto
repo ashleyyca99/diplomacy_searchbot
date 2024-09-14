@@ -265,6 +265,13 @@ message SearchBotAgent {
 
   // Optional. Use FP16 at inference time for everything.
   optional bool half_precision = 44 [ default = false ];
+
+  // Algoritms to use
+  message AlgorithmConfig {
+    optional string primary_algorithm = 1 [ default = "" ];
+    optional string secondary_algorithm = 2 [ default = "" ];
+  }
+  optional AlgorithmConfig algorithm_cfg = 45;
 }
 
 message BRSearchAgent {

@@ -16,4 +16,9 @@ searchbot {
   }
 
   max_batch_size: 700
+
+  algorithm_cfg {
+    primary_algorithm: "RWM"
+    secondary_algorithm: ""
+  }
 }
