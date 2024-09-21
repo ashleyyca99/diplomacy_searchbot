@@ -89,7 +89,7 @@ class CFRData:
             elif algorithm_cfg.primary_algorithm == "BM":
                 self.algorithms[pwr] = BMAlg(alg_2nd, eta1, N=N)
             elif algorithm_cfg.primary_algorithm == "TreeSwap":
-                self.algorithms[pwr] = TreeSwap(alg_2nd, eta2, M, d)
+                self.algorithms[pwr] = TreeSwap(alg_2nd, eta2, N, M, d)
             
         if all(x <= 0 for y in bp_policy.values() for x in y.values()):
             # this is a dummy policy, only the order keys should be used
@@ -152,10 +152,8 @@ class CFRData:
         self.cum_weight = self.cum_weight * discount_factor + 1.0
 
     def update(self, cfr_iter, pwr, actions, state_utility, action_regrets):
-        #print ("hi") # try multiplicitive weights and compare with BM and BM with multiplicitive weights
         #import traceback
         #traceback.print_stack()
-        ### x = self.algorithms[pwr].act(cfr_iter)
         self.cfr_iter = cfr_iter
 
         sigmas = self.strategy(pwr)
@@ -265,6 +263,46 @@ class SearchBotAgent(BaseSearchAgent):
         if len(prob_distributions[power]) == 0:
             return ()
         return sample_p_dict(prob_distributions[power])
+
+    def log_all_utilities(self, game, turn):
+        if turn <= 0 : return
+        print("===== log_all_utilities =====")
+        bp_policy = self.get_plausible_orders_policy(game)
+        print(f"===== len(bp_policy): {len(bp_policy)} ====== ")
+        power_plausible_orders: PlausibleOrders = {p: sorted(actions) for p, actions in bp_policy.items()}
+
+        # action to index map for each power
+        power_action_indices = {
+            p: {a:i for i, a in enumerate(actions)}
+            for p, actions in power_plausible_orders.items()
+        }
+        logging.info(f"===== writting matrix/turn_{turn}_info.txt ====== ")
+        f = open(f'matrix/turn_{turn}_info.txt', 'w')
+        f.write(f"Powers: {POWERS}\n")
+        f.write(f"Actions: {power_action_indices}\n")        
+        f.close()
+        set_orders_dicts = [
+            {p:a for p,a in zip(power_plausible_orders.keys(), c)}
+            for c in itertools.product(*power_plausible_orders.values())
+        ]
+
+        action_counts = [len(power_plausible_orders[p]) for p in POWERS]
+
+        utilities = {p: np.zeros(action_counts) for p in POWERS}
+        utilities_flat = {p: u.reshape(np.prod(action_counts)) for p, u in utilities.items()}
+        batch_size = 1024 * 16
+        for g in range(0, len(set_orders_dicts), batch_size):
+            logging.info(f"===== run batch: {g} - {g+batch_size} / {len(set_orders_dicts)} ====== ")
+            results = self.model_rollouts.do_rollouts(game, set_orders_dicts[g : (g + batch_size)])
+
+            for set_orders_dict, action_utilities in results:
+                indices = [power_action_indices[p][set_orders_dict[p]] for p in POWERS]
+                flat_index = np.ravel_multi_index(indices, action_counts)
+                for p in POWERS:
+                    utilities_flat[p][flat_index] = action_utilities[p]
+        logging.info(f'writting matrix/turn_{turn}.npz')
+        np.savez(f'matrix/turn_{turn}.npz', **utilities)
+
 
     def get_orders_many_powers(
         self, game, powers, timings=None, single_cfr=False, bp_policy=None
@@ -425,6 +463,8 @@ class SearchBotAgent(BaseSearchAgent):
                 joint_orders = sample_all_joint_orders(cfr_data.power_plausible_orders)
                 rollout_results_cache.get(joint_orders, on_miss)
 
+        
+
         sampled_action_history = []
         rollout_result_history = []
         power_is_loser = {}  # make typechecker happy
@@ -481,6 +521,12 @@ class SearchBotAgent(BaseSearchAgent):
             )
             timings.start("cfr")
 
+            # f = open('output.txt', 'a')
+            # if cfr_iter == self.n_rollouts - 1:
+            #     f.write(f"=======================all_rollout_results== {self.n_rollouts}:{len(all_rollout_results)} ========================\n")
+            #     f.write(f"{set_orders_dicts}\n\n")
+            #     # print(all_rollout_results)
+
             for pwr, actions in cfr_data.power_plausible_orders.items():
                 if len(actions) == 0:
                     continue
@@ -490,6 +536,10 @@ class SearchBotAgent(BaseSearchAgent):
                     all_rollout_results[: len(actions)],
                     all_rollout_results[len(actions) :],
                 )
+                # if cfr_iter == self.n_rollouts - 1:
+                #     f.write(f"\n{pwr} : {len(actions)} actions\n")
+                #     for a, r in zip(actions, results):
+                #         f.write(f"{a}\n{r[0]}\n{r[1]}\n")
                 rollout_result_history.append((cfr_iter, pwr, results))
                 # logging.info(f"Results {pwr} = {results}")
                 # calculate regrets

@@ -15,6 +15,7 @@ from typing import List, Dict, Optional
 from fairdiplomacy.pydipcc import Game
 from fairdiplomacy.models.consts import POWERS
 
+from fairdiplomacy.agents import searchbot_agent
 
 PYDIPCC_MAX_YEAR = 1935
 
@@ -41,6 +42,7 @@ class OneSixPolicyProfile(_BasePolicyProfile):
         self._six_powers = [p for p in POWERS if p != agent_one_power]
         self._agent_one = agent_one
         self._agent_six = agent_six
+        self.turn = 0
 
     def get_all_power_orders(self, game):
         logging.debug("Starting turn {}".format(game.phase))
@@ -53,6 +55,12 @@ class OneSixPolicyProfile(_BasePolicyProfile):
         # and the base class implementation constructs views inside of
         # `get_orders_many_powers`
         orders.update(self._agent_six.get_orders_many_powers(game, self._six_powers))
+
+        # log utility metrics
+        if isinstance(self._agent_six, searchbot_agent.SearchBotAgent):
+            self._agent_six.log_all_utilities(game, self.turn)
+        self.turn += 1
+
         return orders
 
 class SharedPolicyProfile(_BasePolicyProfile):

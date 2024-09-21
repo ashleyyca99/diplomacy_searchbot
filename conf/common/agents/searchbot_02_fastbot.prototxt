@@ -6,7 +6,7 @@ searchbot {
     max_actions_units_ratio: 3.5
     req_size: 1024
   }
-  n_rollouts: 256
+  n_rollouts: 10
   rollouts_cfg {
     n_threads: 56
     temperature: 0.75
@@ -18,7 +18,7 @@ searchbot {
   max_batch_size: 700
 
   algorithm_cfg {
-    primary_algorithm: "RWM"
+    primary_algorithm: ""
     secondary_algorithm: ""
   }
 }
