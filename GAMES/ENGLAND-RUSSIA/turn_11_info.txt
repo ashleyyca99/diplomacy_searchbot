@@ -1,0 +1,2 @@
+Powers: ['ENGLAND', 'RUSSIA']
+Actions: {'AUSTRIA': {('A BUD D',): 0}, 'ENGLAND': {}, 'FRANCE': {}, 'GERMANY': {}, 'ITALY': {}, 'RUSSIA': {}, 'TURKEY': {}}
